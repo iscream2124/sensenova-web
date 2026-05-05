@@ -1,0 +1,414 @@
+#!/usr/bin/env python3
+"""
+SenseNova-Skills REST API Server
+FastAPI로 SenseNova 스킬들을 REST 엔드포인트로 노출합니다.
+"""
+
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional, List
+import os
+import json
+import subprocess
+import tempfile
+from pathlib import Path
+from datetime import datetime
+import uuid
+
+app = FastAPI(
+    title="SenseNova-Skills API",
+    description="REST API for SenseNova generation and analysis skills",
+    version="1.0.0"
+)
+
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Configuration
+SENSENOVA_SKILLS_PATH = Path("/tmp/SenseNova-Skills")
+OUTPUT_DIR = Path("/tmp/sensenova_outputs")
+WEB_DIR = Path("/Users/im_1181/.cokacdir/workspace/t2uu7ari/web")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+# 정적 파일 제공 (웹앱)
+if WEB_DIR.exists():
+    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
+# ==================== Models ====================
+
+class InfographicRequest(BaseModel):
+    """인포그래픽 생성 요청"""
+    user_prompt: str
+    max_rounds: int = 1
+    output_mode: str = "friendly"  # friendly, verbose
+    prompts_expand_mode: str = "auto"  # auto, force, disable
+
+class InfographicResponse(BaseModel):
+    """인포그래픽 생성 응답"""
+    status: str
+    task_id: str
+    message: str
+    image_path: Optional[str] = None
+    metadata: dict = {}
+
+class PPTRequest(BaseModel):
+    """PPT 생성 요청"""
+    title: str
+    content: str
+    mode: str = "standard"  # creative, standard
+    page_count: int = 5
+    style: Optional[str] = None
+
+class PPTResponse(BaseModel):
+    """PPT 생성 응답"""
+    status: str
+    task_id: str
+    message: str
+    pptx_path: Optional[str] = None
+
+class DataAnalysisRequest(BaseModel):
+    """데이터 분석 요청"""
+    file_path: str
+    analysis_type: str = "summary"  # summary, detailed, export
+
+class ResearchRequest(BaseModel):
+    """심층 연구 요청"""
+    topic: str
+    dimensions: List[str]
+    depth_level: str = "standard"  # brief, standard, deep
+
+class SkillListResponse(BaseModel):
+    """사용 가능한 스킬 목록"""
+    available_skills: List[str]
+    total_count: int
+
+class HealthResponse(BaseModel):
+    """서버 상태"""
+    status: str
+    version: str
+    skills_path: str
+    available: bool
+
+# ==================== Utility Functions ====================
+
+def get_available_skills() -> List[str]:
+    """설치된 스킬 목록 조회"""
+    if not SENSENOVA_SKILLS_PATH.exists():
+        return []
+
+    skills = []
+    skills_dir = SENSENOVA_SKILLS_PATH / "skills"
+    if skills_dir.exists():
+        skills = [d.name for d in skills_dir.iterdir() if d.is_dir()]
+
+    return sorted(skills)
+
+def generate_task_id() -> str:
+    """작업 ID 생성"""
+    return f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
+
+def run_skill(skill_name: str, params: dict) -> dict:
+    """스킬 실행 (placeholder - 실제 구현은 각 스킬의 메커니즘에 따라 다름)"""
+    task_id = generate_task_id()
+
+    try:
+        # 이는 개념적 구현입니다.
+        # 실제로는 각 스킬의 실행 메커니즘을 고려해야 합니다.
+        # 예: Python 스크립트 호출, API 호출, 등
+
+        return {
+            "status": "pending",
+            "task_id": task_id,
+            "skill": skill_name,
+            "params": params,
+            "message": f"Skill {skill_name} execution started"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "task_id": task_id
+        }
+
+# ==================== Health & Info Endpoints ====================
+
+@app.get("/")
+async def root():
+    """루트: 웹앱 또는 API 정보 제공"""
+    # 웹 파일이 있으면 웹앱 제공, 없으면 API 정보 제공
+    if WEB_DIR.exists() and (WEB_DIR / "index.html").exists():
+        return FileResponse(WEB_DIR / "index.html", media_type="text/html")
+
+    return {
+        "service": "SenseNova-Skills REST API",
+        "version": "1.0.0",
+        "webapp": "http://localhost:8001/",
+        "docs": "http://localhost:8001/docs",
+        "endpoints": {
+            "health": "GET /health",
+            "skills": "GET /skills",
+            "infographic": "POST /api/v1/infographic",
+            "ppt": "POST /api/v1/ppt",
+            "analysis": "POST /api/v1/analysis",
+            "research": "POST /api/v1/research"
+        }
+    }
+
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """서버 상태 확인"""
+    skills_available = SENSENOVA_SKILLS_PATH.exists()
+
+    return HealthResponse(
+        status="healthy",
+        version="1.0.0",
+        skills_path=str(SENSENOVA_SKILLS_PATH),
+        available=skills_available
+    )
+
+@app.get("/skills", response_model=SkillListResponse)
+async def list_skills():
+    """설치된 스킬 목록"""
+    skills = get_available_skills()
+
+    return SkillListResponse(
+        available_skills=skills,
+        total_count=len(skills)
+    )
+
+# ==================== Image Generation ====================
+
+@app.post("/api/v1/infographic", response_model=InfographicResponse)
+async def generate_infographic(request: InfographicRequest):
+    """
+    인포그래픽 생성
+
+    Parameters:
+    - user_prompt: 생성할 인포그래픽의 설명
+    - max_rounds: 생성 라운드 수 (기본값: 1)
+    - output_mode: 출력 모드 (friendly/verbose)
+    - prompts_expand_mode: 프롬프트 확장 전략 (auto/force/disable)
+    """
+    task_id = generate_task_id()
+
+    try:
+        # 스킬 실행 (실제 구현은 sn-image-base 및 sn-infographic 호출)
+        result = run_skill("sn-infographic", {
+            "user_prompt": request.user_prompt,
+            "max_rounds": request.max_rounds,
+            "output_mode": request.output_mode,
+            "prompts_expand_mode": request.prompts_expand_mode
+        })
+
+        return InfographicResponse(
+            status="success",
+            task_id=task_id,
+            message=f"Infographic generation queued: {request.user_prompt[:50]}...",
+            metadata={
+                "max_rounds": request.max_rounds,
+                "mode": request.output_mode,
+                "prompt_len": len(request.user_prompt)
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Presentation Generation ====================
+
+@app.post("/api/v1/ppt", response_model=PPTResponse)
+async def generate_ppt(request: PPTRequest):
+    """
+    PPT 생성
+
+    Parameters:
+    - title: 프레젠테이션 제목
+    - content: 프레젠테이션 내용
+    - mode: 생성 모드 (creative/standard)
+    - page_count: 슬라이드 수
+    - style: 스타일 (선택사항)
+    """
+    task_id = generate_task_id()
+
+    try:
+        result = run_skill("sn-ppt-entry", {
+            "title": request.title,
+            "content": request.content,
+            "mode": request.mode,
+            "page_count": request.page_count,
+            "style": request.style
+        })
+
+        return PPTResponse(
+            status="success",
+            task_id=task_id,
+            message=f"PPT generation queued for '{request.title}'",
+            pptx_path=None
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Data Analysis ====================
+
+@app.post("/api/v1/analysis")
+async def analyze_data(
+    file: UploadFile = File(...),
+    analysis_type: str = Form("summary")
+):
+    """
+    데이터 분석
+
+    Parameters:
+    - file: 분석할 파일 (Excel, CSV)
+    - analysis_type: 분석 유형 (summary/detailed/export)
+    """
+    task_id = generate_task_id()
+
+    try:
+        # 임시 파일로 저장
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file.filename) as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        result = run_skill("sn-da-excel-workflow", {
+            "file_path": tmp_path,
+            "analysis_type": analysis_type
+        })
+
+        return JSONResponse({
+            "status": "success",
+            "task_id": task_id,
+            "message": f"Data analysis queued for {file.filename}",
+            "file_name": file.filename,
+            "analysis_type": analysis_type
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Deep Research ====================
+
+@app.post("/api/v1/research")
+async def deep_research(request: ResearchRequest):
+    """
+    심층 연구
+
+    Parameters:
+    - topic: 연구 주제
+    - dimensions: 연구 차원 (리스트)
+    - depth_level: 깊이 수준 (brief/standard/deep)
+    """
+    task_id = generate_task_id()
+
+    try:
+        result = run_skill("sn-deep-research", {
+            "topic": request.topic,
+            "dimensions": request.dimensions,
+            "depth_level": request.depth_level
+        })
+
+        return JSONResponse({
+            "status": "success",
+            "task_id": task_id,
+            "message": f"Deep research queued for '{request.topic}'",
+            "dimensions_count": len(request.dimensions),
+            "depth": request.depth_level
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Batch Operations ====================
+
+@app.get("/api/v1/status/{task_id}")
+async def get_task_status(task_id: str):
+    """작업 상태 조회"""
+    return JSONResponse({
+        "task_id": task_id,
+        "status": "pending",  # pending, processing, completed, failed
+        "progress": 0,
+        "message": "Task status tracking coming soon"
+    })
+
+@app.get("/api/v1/outputs")
+async def list_outputs():
+    """생성된 파일 목록"""
+    outputs = []
+
+    if OUTPUT_DIR.exists():
+        for file in OUTPUT_DIR.iterdir():
+            if file.is_file():
+                outputs.append({
+                    "filename": file.name,
+                    "size": file.stat().st_size,
+                    "created": datetime.fromtimestamp(file.stat().st_ctime).isoformat()
+                })
+
+    return JSONResponse({
+        "total": len(outputs),
+        "outputs": outputs
+    })
+
+# ==================== Skill Details ====================
+
+@app.get("/api/v1/skill/{skill_name}")
+async def get_skill_info(skill_name: str):
+    """스킬 정보 조회"""
+    skill_path = SENSENOVA_SKILLS_PATH / "skills" / skill_name
+
+    if not skill_path.exists():
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found")
+
+    skill_md = skill_path / "SKILL.md"
+
+    info = {
+        "name": skill_name,
+        "exists": True,
+        "path": str(skill_path),
+        "has_skill_md": skill_md.exists(),
+        "structure": []
+    }
+
+    # 디렉토리 구조 읽기
+    for item in skill_path.iterdir():
+        info["structure"].append(item.name)
+
+    return JSONResponse(info)
+
+# ==================== Main ====================
+
+if __name__ == "__main__":
+    import uvicorn
+    import sys
+    import os
+
+    # 포트: 환경변수 > 커맨드라인 > 기본값
+    port = int(os.getenv('PORT', sys.argv[1] if len(sys.argv) > 1 else 8001))
+    host = os.getenv('HOST', '0.0.0.0')
+
+    print("=" * 80)
+    print("🚀 SenseNova-Skills REST API Server")
+    print("=" * 80)
+    print(f"Host: {host}:{port}")
+    print(f"Skills Path: {SENSENOVA_SKILLS_PATH}")
+    print(f"Available Skills: {len(get_available_skills())}")
+    print(f"Output Directory: {OUTPUT_DIR}")
+    print("=" * 80)
+    print(f"\n📚 API Documentation: http://localhost:{port}/docs")
+    print(f"🔗 Root: http://localhost:{port}/")
+    print("\n")
+
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        reload=False,
+        log_level="info"
+    )

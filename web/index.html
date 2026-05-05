@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SenseNova Skills - AI 창작 도구</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #ec4899;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+        }
+
+        * {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--primary-color) !important;
+        }
+
+        .container-main {
+            max-width: 1400px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .hero-section {
+            color: white;
+            text-align: center;
+            margin-bottom: 50px;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        .hero-section h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero-section p {
+            font-size: 1.2rem;
+            opacity: 0.95;
+        }
+
+        .skill-card {
+            background: white;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+
+        .skill-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .skill-card-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 25px;
+            border-radius: 12px 12px 0 0;
+            text-align: center;
+        }
+
+        .skill-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .skill-card-body {
+            padding: 25px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-top: 15px;
+            margin-bottom: 8px;
+        }
+
+        .form-control, .form-select, .form-textarea {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px 15px;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus, .form-select:focus, .form-textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
+        }
+
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 12px 30px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+            color: white;
+        }
+
+        .btn-primary-custom:active {
+            transform: translateY(0);
+        }
+
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+        }
+
+        .result-box {
+            background: #f0f9ff;
+            border-left: 4px solid var(--primary-color);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            animation: slideInUp 0.5s ease;
+        }
+
+        .result-box.error {
+            background: #fef2f2;
+            border-left-color: #ef4444;
+        }
+
+        .result-box.success {
+            background: #f0fdf4;
+            border-left-color: var(--success-color);
+        }
+
+        .badge-custom {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .nav-tabs .nav-link {
+            color: #666;
+            border: none;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -3px;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            background: none;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .status-badge.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge.error {
+            background: #fee2e2;
+            color: #7f1d1d;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .task-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .task-item {
+            padding: 15px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-item:hover {
+            background: #f9fafb;
+        }
+
+        .task-id {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .file-upload-zone {
+            border: 2px dashed var(--primary-color);
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .file-upload-zone:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--secondary-color);
+        }
+
+        .file-upload-zone.dragover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: var(--secondary-color);
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            padding: 30px 0;
+            margin-top: 60px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light sticky-top">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-sparkles"></i> SenseNova Skills
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#infographic-section">인포그래픽</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#ppt-section">PPT</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#analysis-section">데이터 분석</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#research-section">심층 연구</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#tasks-section">작업 현황</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <div class="container-main">
+        <div class="hero-section">
+            <h1>🚀 SenseNova AI 창작 도구</h1>
+            <p>인포그래픽, 프레젠테이션, 데이터 분석, 심층 연구를 한 번에</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row g-4">
+            <!-- 인포그래픽 -->
+            <div class="col-lg-6" id="infographic-section">
+                <div class="skill-card">
+                    <div class="skill-card-header">
+                        <div class="skill-icon"><i class="bi bi-graph-up"></i></div>
+                        <h5>📊 인포그래픽 생성</h5>
+                    </div>
+                    <div class="skill-card-body">
+                        <label class="form-label">설명</label>
+                        <textarea class="form-control" id="infograph-prompt"
+                            placeholder="예: AI 시대 교육 혁신 전략" rows="4"></textarea>
+
+                        <label class="form-label">생성 라운드</label>
+                        <input type="number" class="form-control" id="infograph-rounds"
+                            value="1" min="1" max="3">
+
+                        <label class="form-label">출력 모드</label>
+                        <select class="form-select" id="infograph-mode">
+                            <option value="friendly">친화적 (간단)</option>
+                            <option value="verbose">상세 (자세함)</option>
+                        </select>
+
+                        <button class="btn btn-primary-custom mt-4" onclick="generateInfographic()">
+                            <i class="bi bi-lightning-fill"></i> 생성하기
+                        </button>
+                        <div id="infograph-result"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PPT 생성 -->
+            <div class="col-lg-6" id="ppt-section">
+                <div class="skill-card">
+                    <div class="skill-card-header">
+                        <div class="skill-icon"><i class="bi bi-file-earmark-ppt"></i></div>
+                        <h5>📑 PPT 생성</h5>
+                    </div>
+                    <div class="skill-card-body">
+                        <label class="form-label">제목</label>
+                        <input type="text" class="form-control" id="ppt-title"
+                            placeholder="프레젠테이션 제목">
+
+                        <label class="form-label">내용</label>
+                        <textarea class="form-control" id="ppt-content"
+                            placeholder="# 제목&#10;내용 (마크다운 형식)" rows="4"></textarea>
+
+                        <label class="form-label">모드</label>
+                        <select class="form-select" id="ppt-mode">
+                            <option value="standard">표준 (텍스트 중심)</option>
+                            <option value="creative">창작 (이미지 중심)</option>
+                        </select>
+
+                        <label class="form-label">슬라이드 수</label>
+                        <input type="number" class="form-control" id="ppt-pages"
+                            value="8" min="3" max="50">
+
+                        <button class="btn btn-primary-custom mt-4" onclick="generatePPT()">
+                            <i class="bi bi-lightning-fill"></i> 생성하기
+                        </button>
+                        <div id="ppt-result"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 데이터 분석 -->
+            <div class="col-lg-6" id="analysis-section">
+                <div class="skill-card">
+                    <div class="skill-card-header">
+                        <div class="skill-icon"><i class="bi bi-graph-up"></i></div>
+                        <h5>📈 데이터 분석</h5>
+                    </div>
+                    <div class="skill-card-body">
+                        <label class="form-label">파일 선택</label>
+                        <div class="file-upload-zone" id="file-upload" onclick="document.getElementById('file-input').click()">
+                            <i class="bi bi-cloud-arrow-up" style="font-size: 2rem; color: var(--primary-color); margin-bottom: 10px;"></i>
+                            <p><strong>파일을 여기에 드래그하거나 클릭</strong></p>
+                            <small>Excel (.xlsx), CSV 지원</small>
+                        </div>
+                        <input type="file" id="file-input" style="display: none;"
+                            accept=".xlsx,.csv,.xls">
+                        <div id="file-name" class="mt-2"></div>
+
+                        <label class="form-label mt-3">분석 유형</label>
+                        <select class="form-select" id="analysis-type">
+                            <option value="summary">요약</option>
+                            <option value="detailed">상세 분석</option>
+                            <option value="export">내보내기</option>
+                        </select>
+
+                        <button class="btn btn-primary-custom mt-4" onclick="analyzeData()">
+                            <i class="bi bi-lightning-fill"></i> 분석하기
+                        </button>
+                        <div id="analysis-result"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 심층 연구 -->
+            <div class="col-lg-6" id="research-section">
+                <div class="skill-card">
+                    <div class="skill-card-header">
+                        <div class="skill-icon"><i class="bi bi-search"></i></div>
+                        <h5>🔬 심층 연구</h5>
+                    </div>
+                    <div class="skill-card-body">
+                        <label class="form-label">연구 주제</label>
+                        <input type="text" class="form-control" id="research-topic"
+                            placeholder="예: 한국 교육 기술 시장">
+
+                        <label class="form-label">연구 차원</label>
+                        <textarea class="form-control" id="research-dimensions"
+                            placeholder="각 줄에 하나씩 입력:&#10;시장 규모&#10;기술 트렌드&#10;경쟁 구도" rows="3"></textarea>
+
+                        <label class="form-label">깊이 수준</label>
+                        <select class="form-select" id="research-depth">
+                            <option value="brief">간단</option>
+                            <option value="standard">표준</option>
+                            <option value="deep">심화</option>
+                        </select>
+
+                        <button class="btn btn-primary-custom mt-4" onclick="deepResearch()">
+                            <i class="bi bi-lightning-fill"></i> 연구 시작
+                        </button>
+                        <div id="research-result"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 작업 현황 -->
+        <div class="card mt-5" id="tasks-section" style="background: white; border: none; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);">
+            <div class="card-header" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; border-radius: 12px 12px 0 0;">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> 최근 작업 현황</h5>
+            </div>
+            <div class="card-body">
+                <div class="task-list" id="task-list">
+                    <p class="text-muted text-center py-3">아직 작업이 없습니다</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><i class="bi bi-c-circle"></i> 2026 SenseNova Skills | Powered by AI</p>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="overlay" id="overlay"></div>
+    <div class="loading-spinner" id="loadingSpinner">
+        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">로딩 중...</span>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
