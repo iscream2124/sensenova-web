@@ -1,5 +1,5 @@
 // SenseNova Skills Web App
-const API_BASE = 'http://localhost:8001';
+const API_BASE = '';
 let tasks = [];
 
 // 로딩 표시
