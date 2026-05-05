@@ -1,23 +1,12 @@
 // SenseNova Skills Web App
 const API_BASE = '';
 let tasks = [];
+let pollingIntervals = {};
 
 // 로딩 표시
 function showLoading(show = true) {
     document.getElementById('overlay').style.display = show ? 'block' : 'none';
     document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
-}
-
-// 진행 상태 업데이트
-function updateTaskStatus(taskId, status, progress = 0, message = '', timeRemaining = 0) {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-        task.status = status;
-        task.progress = progress;
-        task.message = message;
-        task.timeRemaining = timeRemaining;
-        renderTasks();
-    }
 }
 
 // 작업 추가
@@ -28,28 +17,51 @@ function addTask(taskId, skillName, prompt, startTime) {
         prompt: prompt,
         status: 'processing',
         progress: 0,
-        message: '처리 중...',
+        message: '⏳ 처리 중...',
         timeRemaining: 0,
         startTime: startTime,
         createdAt: new Date().toLocaleTimeString('ko-KR')
     });
     renderTasks();
+    startPolling(taskId);
 }
 
-// 남은 시간 계산 (추정)
-function estimateTimeRemaining(skillType) {
-    const estimates = {
-        'infographic': 120,  // 2분
-        'ppt': 180,          // 3분
-        'analysis': 90,      // 1.5분
-        'research': 240      // 4분
-    };
-    return estimates[skillType] || 120;
-}
+// 상태 폴링 시작
+function startPolling(taskId) {
+    if (pollingIntervals[taskId]) {
+        clearInterval(pollingIntervals[taskId]);
+    }
 
-// 진행률 계산 (시간 기반)
-function calculateProgress(elapsed, estimated) {
-    return Math.min(100, Math.round((elapsed / estimated) * 100));
+    pollingIntervals[taskId] = setInterval(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/v1/status/${taskId}`);
+            const data = await response.json();
+
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                task.status = data.status;
+                task.progress = data.progress || 0;
+                task.message = data.message || '처리 중...';
+
+                if (data.status === 'completed') {
+                    task.message = '✅ 완료!';
+                    if (data.output_file) {
+                        task.output_file = data.output_file;
+                        task.file_type = data.file_type;
+                    }
+                    clearInterval(pollingIntervals[taskId]);
+                    delete pollingIntervals[taskId];
+                } else if (data.status === 'error') {
+                    task.message = data.message;
+                    clearInterval(pollingIntervals[taskId]);
+                    delete pollingIntervals[taskId];
+                }
+                renderTasks();
+            }
+        } catch (error) {
+            console.error('Polling error:', error);
+        }
+    }, 2000);  // 2초마다 폴링
 }
 
 // 작업 목록 렌더링
@@ -77,12 +89,20 @@ function renderTasks() {
                     </div>
                     <small style="display: flex; justify-content: space-between; margin-top: 4px; color: #666;">
                         <span>${task.progress}% 완료</span>
-                        <span>${task.timeRemaining > 0 ? task.timeRemaining + '초 남음' : '완료'}</span>
                     </small>
                 </div>
                 <small class="text-muted" style="display: block; margin-top: 4px;">
                     📅 ${task.createdAt} | ${task.message}
                 </small>
+                ${task.output_file ? `
+                    <div style="margin-top: 8px;">
+                        <a href="${API_BASE}/api/v1/download/${task.id}"
+                           class="btn btn-sm btn-success"
+                           style="text-decoration: none; padding: 4px 12px; font-size: 0.85rem;">
+                            📥 다운로드
+                        </a>
+                    </div>
+                ` : ''}
             </div>
         </div>
     `).join('');
@@ -103,6 +123,7 @@ function getStatusText(status) {
         'processing': '⏳ 처리 중',
         'completed': '✅ 완료',
         'failed': '❌ 실패',
+        'error': '❌ 오류',
         'pending': '⏱️ 대기 중'
     };
     return texts[status] || status;
@@ -121,7 +142,6 @@ async function generateInfographic() {
 
     showLoading(true);
     const startTime = Date.now();
-    const taskId = `task_${Date.now()}`;
 
     try {
         const response = await fetch(`${API_BASE}/api/v1/infographic`, {
@@ -139,20 +159,12 @@ async function generateInfographic() {
         if (result.status === 'success') {
             addTask(result.task_id, 'sn-infographic', prompt, startTime);
 
-            // 진행 상태 시뮬레이션
-            simulateProgress(result.task_id, 'infographic');
-
             document.getElementById('infograph-result').innerHTML = `
                 <div class="result-box success" style="margin-top: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <strong>✅ 요청 완료!</strong>
-                            <small style="display: block; color: #666; margin-top: 4px;">
-                                Task ID: ${result.task_id}<br/>
-                                생성이 진행 중입니다. 아래 '최근 작업 현황'을 확인하세요.
-                            </small>
-                        </div>
-                    </div>
+                    <strong>✅ 요청 완료!</strong>
+                    <small style="display: block; color: #666; margin-top: 4px;">
+                        처리가 진행 중입니다. 아래 '최근 작업 현황'을 확인하세요.
+                    </small>
                 </div>
             `;
             document.getElementById('infograph-prompt').value = '';
@@ -169,24 +181,6 @@ async function generateInfographic() {
     } finally {
         showLoading(false);
     }
-}
-
-// 진행 상태 시뮬레이션
-function simulateProgress(taskId, skillType) {
-    const totalTime = estimateTimeRemaining(skillType);
-    let elapsed = 0;
-    const interval = setInterval(() => {
-        elapsed += 5;  // 5초마다 업데이트
-        const progress = calculateProgress(elapsed, totalTime);
-        const timeRemaining = Math.max(0, totalTime - elapsed);
-
-        updateTaskStatus(taskId, 'processing', progress, '처리 중...', Math.ceil(timeRemaining));
-
-        if (elapsed >= totalTime) {
-            clearInterval(interval);
-            updateTaskStatus(taskId, 'completed', 100, '✅ 처리 완료', 0);
-        }
-    }, 5000);  // 5초마다
 }
 
 // PPT 생성
@@ -220,7 +214,6 @@ async function generatePPT() {
 
         if (result.status === 'success') {
             addTask(result.task_id, 'sn-ppt-entry', title, startTime);
-            simulateProgress(result.task_id, 'ppt');
 
             document.getElementById('ppt-result').innerHTML = `
                 <div class="result-box success">
@@ -272,7 +265,6 @@ async function analyzeData() {
 
         if (result.status === 'success') {
             addTask(result.task_id, 'sn-da-excel-workflow', fileInput.files[0].name, startTime);
-            simulateProgress(result.task_id, 'analysis');
 
             document.getElementById('analysis-result').innerHTML = `
                 <div class="result-box success">
@@ -325,7 +317,6 @@ async function deepResearch() {
 
         if (result.status === 'success') {
             addTask(result.task_id, 'sn-deep-research', topic, startTime);
-            simulateProgress(result.task_id, 'research');
 
             document.getElementById('research-result').innerHTML = `
                 <div class="result-box success">
