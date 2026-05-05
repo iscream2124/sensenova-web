@@ -35,6 +35,7 @@ sensenova_api.log
 /tmp/
 /temp/
 sensenova_outputs/
+outputs/
 
 # Environment
 .env

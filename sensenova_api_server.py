@@ -35,9 +35,9 @@ app.add_middleware(
 
 # Configuration
 SENSENOVA_SKILLS_PATH = Path("/tmp/SenseNova-Skills")
-OUTPUT_DIR = Path("/tmp/sensenova_outputs")
+OUTPUT_DIR = Path(__file__).parent / "outputs"
 WEB_DIR = Path(__file__).parent / "web"
-OUTPUT_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 
 # 정적 파일 제공 (웹앱)
 if WEB_DIR.exists():
