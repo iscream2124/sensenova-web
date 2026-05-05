@@ -17,8 +17,6 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 import uuid
-import threading
-import time
 
 app = FastAPI(
     title="SenseNova-Skills API",
@@ -121,9 +119,8 @@ def generate_task_id() -> str:
 task_results = {}
 
 def generate_sample_output(skill_name: str, task_id: str, params: dict):
-    """백그라운드에서 샘플 출력 생성"""
+    """샘플 출력 생성"""
     try:
-        time.sleep(1)  # 처리 시뮬레이션
 
         if skill_name == "sn-infographic":
             # SVG 인포그래픽 생성
@@ -248,30 +245,6 @@ Generated at: {datetime.now().isoformat()}
             "error": str(e)
         }
 
-def run_skill(skill_name: str, params: dict) -> dict:
-    """스킬 실행"""
-    task_id = generate_task_id()
-
-    try:
-        task_results[task_id] = {"status": "processing"}
-        # 백그라운드에서 실행
-        thread = threading.Thread(target=generate_sample_output, args=(skill_name, task_id, params))
-        thread.daemon = True
-        thread.start()
-
-        return {
-            "status": "success",
-            "task_id": task_id,
-            "skill": skill_name,
-            "message": f"Task {skill_name} started successfully"
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "task_id": task_id
-        }
-
 # ==================== Health & Info Endpoints ====================
 
 @app.get("/")
@@ -334,24 +307,19 @@ async def generate_infographic(request: InfographicRequest):
     task_id = generate_task_id()
 
     try:
-        # 스킬 실행
-        task_results[task_id] = {"status": "processing"}
-        thread = threading.Thread(
-            target=generate_sample_output,
-            args=("sn-infographic", task_id, {
-                "user_prompt": request.user_prompt,
-                "max_rounds": request.max_rounds,
-                "output_mode": request.output_mode,
-                "prompts_expand_mode": request.prompts_expand_mode
-            })
-        )
-        thread.daemon = True
-        thread.start()
+        # 동기로 파일 생성
+        generate_sample_output("sn-infographic", task_id, {
+            "user_prompt": request.user_prompt,
+            "max_rounds": request.max_rounds,
+            "output_mode": request.output_mode,
+            "prompts_expand_mode": request.prompts_expand_mode
+        })
 
         return InfographicResponse(
             status="success",
             task_id=task_id,
-            message=f"Infographic generation queued: {request.user_prompt[:50]}...",
+            message=f"✅ Infographic generated successfully: {request.user_prompt[:50]}...",
+            image_path=str(OUTPUT_DIR / f"{task_id}_infographic.svg"),
             metadata={
                 "max_rounds": request.max_rounds,
                 "mode": request.output_mode,
@@ -378,25 +346,19 @@ async def generate_ppt(request: PPTRequest):
     task_id = generate_task_id()
 
     try:
-        task_results[task_id] = {"status": "processing"}
-        thread = threading.Thread(
-            target=generate_sample_output,
-            args=("sn-ppt-entry", task_id, {
-                "title": request.title,
-                "content": request.content,
-                "mode": request.mode,
-                "page_count": request.page_count,
-                "style": request.style
-            })
-        )
-        thread.daemon = True
-        thread.start()
+        generate_sample_output("sn-ppt-entry", task_id, {
+            "title": request.title,
+            "content": request.content,
+            "mode": request.mode,
+            "page_count": request.page_count,
+            "style": request.style
+        })
 
         return PPTResponse(
             status="success",
             task_id=task_id,
-            message=f"PPT generation queued for '{request.title}'",
-            pptx_path=None
+            message=f"PPT generated successfully for '{request.title}'",
+            pptx_path=str(OUTPUT_DIR / f"{task_id}_presentation.txt")
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -424,23 +386,18 @@ async def analyze_data(
             tmp.write(content)
             tmp_path = tmp.name
 
-        task_results[task_id] = {"status": "processing"}
-        thread = threading.Thread(
-            target=generate_sample_output,
-            args=("sn-da-excel-workflow", task_id, {
-                "file_path": tmp_path,
-                "analysis_type": analysis_type
-            })
-        )
-        thread.daemon = True
-        thread.start()
+        generate_sample_output("sn-da-excel-workflow", task_id, {
+            "file_path": tmp_path,
+            "analysis_type": analysis_type
+        })
 
         return JSONResponse({
             "status": "success",
             "task_id": task_id,
-            "message": f"Data analysis queued for {file.filename}",
+            "message": f"Data analysis completed for {file.filename}",
             "file_name": file.filename,
-            "analysis_type": analysis_type
+            "analysis_type": analysis_type,
+            "output_file": str(OUTPUT_DIR / f"{task_id}_analysis.txt")
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -460,24 +417,19 @@ async def deep_research(request: ResearchRequest):
     task_id = generate_task_id()
 
     try:
-        task_results[task_id] = {"status": "processing"}
-        thread = threading.Thread(
-            target=generate_sample_output,
-            args=("sn-deep-research", task_id, {
-                "topic": request.topic,
-                "dimensions": request.dimensions,
-                "depth_level": request.depth_level
-            })
-        )
-        thread.daemon = True
-        thread.start()
+        generate_sample_output("sn-deep-research", task_id, {
+            "topic": request.topic,
+            "dimensions": request.dimensions,
+            "depth_level": request.depth_level
+        })
 
         return JSONResponse({
             "status": "success",
             "task_id": task_id,
-            "message": f"Deep research queued for '{request.topic}'",
+            "message": f"Deep research completed for '{request.topic}'",
             "dimensions_count": len(request.dimensions),
-            "depth": request.depth_level
+            "depth": request.depth_level,
+            "output_file": str(OUTPUT_DIR / f"{task_id}_research.txt")
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -520,6 +472,30 @@ async def get_task_status(task_id: str):
             "progress": 0,
             "message": "작업을 찾을 수 없습니다"
         }, status_code=404)
+
+@app.get("/api/v1/download/{task_id}")
+async def download_output(task_id: str):
+    """생성된 파일 다운로드"""
+    if task_id not in task_results:
+        raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
+
+    result = task_results[task_id]
+    if result.get("status") != "completed":
+        raise HTTPException(status_code=400, detail=f"Task '{task_id}' is not completed yet")
+
+    output_file = result.get("output_file")
+    if not output_file:
+        raise HTTPException(status_code=400, detail=f"No output file found for task '{task_id}'")
+
+    file_path = Path(output_file)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Output file not found: {output_file}")
+
+    return FileResponse(
+        path=file_path,
+        media_type="application/octet-stream",
+        filename=file_path.name
+    )
 
 @app.get("/api/v1/outputs")
 async def list_outputs():
