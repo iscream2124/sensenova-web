@@ -36,7 +36,7 @@ app.add_middleware(
 # Configuration
 SENSENOVA_SKILLS_PATH = Path("/tmp/SenseNova-Skills")
 OUTPUT_DIR = Path("/tmp/sensenova_outputs")
-WEB_DIR = Path("/Users/im_1181/.cokacdir/workspace/t2uu7ari/web")
+WEB_DIR = Path(__file__).parent / "web"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 # 정적 파일 제공 (웹앱)
