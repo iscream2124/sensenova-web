@@ -123,7 +123,7 @@ task_results = {}
 def generate_sample_output(skill_name: str, task_id: str, params: dict):
     """백그라운드에서 샘플 출력 생성"""
     try:
-        time.sleep(2)  # 처리 시뮬레이션
+        time.sleep(1)  # 처리 시뮬레이션
 
         if skill_name == "sn-infographic":
             # SVG 인포그래픽 생성
@@ -334,13 +334,19 @@ async def generate_infographic(request: InfographicRequest):
     task_id = generate_task_id()
 
     try:
-        # 스킬 실행 (실제 구현은 sn-image-base 및 sn-infographic 호출)
-        result = run_skill("sn-infographic", {
-            "user_prompt": request.user_prompt,
-            "max_rounds": request.max_rounds,
-            "output_mode": request.output_mode,
-            "prompts_expand_mode": request.prompts_expand_mode
-        })
+        # 스킬 실행
+        task_results[task_id] = {"status": "processing"}
+        thread = threading.Thread(
+            target=generate_sample_output,
+            args=("sn-infographic", task_id, {
+                "user_prompt": request.user_prompt,
+                "max_rounds": request.max_rounds,
+                "output_mode": request.output_mode,
+                "prompts_expand_mode": request.prompts_expand_mode
+            })
+        )
+        thread.daemon = True
+        thread.start()
 
         return InfographicResponse(
             status="success",
@@ -372,13 +378,19 @@ async def generate_ppt(request: PPTRequest):
     task_id = generate_task_id()
 
     try:
-        result = run_skill("sn-ppt-entry", {
-            "title": request.title,
-            "content": request.content,
-            "mode": request.mode,
-            "page_count": request.page_count,
-            "style": request.style
-        })
+        task_results[task_id] = {"status": "processing"}
+        thread = threading.Thread(
+            target=generate_sample_output,
+            args=("sn-ppt-entry", task_id, {
+                "title": request.title,
+                "content": request.content,
+                "mode": request.mode,
+                "page_count": request.page_count,
+                "style": request.style
+            })
+        )
+        thread.daemon = True
+        thread.start()
 
         return PPTResponse(
             status="success",
@@ -412,10 +424,16 @@ async def analyze_data(
             tmp.write(content)
             tmp_path = tmp.name
 
-        result = run_skill("sn-da-excel-workflow", {
-            "file_path": tmp_path,
-            "analysis_type": analysis_type
-        })
+        task_results[task_id] = {"status": "processing"}
+        thread = threading.Thread(
+            target=generate_sample_output,
+            args=("sn-da-excel-workflow", task_id, {
+                "file_path": tmp_path,
+                "analysis_type": analysis_type
+            })
+        )
+        thread.daemon = True
+        thread.start()
 
         return JSONResponse({
             "status": "success",
@@ -442,11 +460,17 @@ async def deep_research(request: ResearchRequest):
     task_id = generate_task_id()
 
     try:
-        result = run_skill("sn-deep-research", {
-            "topic": request.topic,
-            "dimensions": request.dimensions,
-            "depth_level": request.depth_level
-        })
+        task_results[task_id] = {"status": "processing"}
+        thread = threading.Thread(
+            target=generate_sample_output,
+            args=("sn-deep-research", task_id, {
+                "topic": request.topic,
+                "dimensions": request.dimensions,
+                "depth_level": request.depth_level
+            })
+        )
+        thread.daemon = True
+        thread.start()
 
         return JSONResponse({
             "status": "success",
