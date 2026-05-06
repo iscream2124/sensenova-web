@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iScream Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { text-align: center; color: white; }
+        h1 { font-size: 2.5em; margin-bottom: 0.5em; }
+        p { font-size: 1.1em; opacity: 0.9; margin-bottom: 2em; }
+        .status { background: rgba(255,255,255,0.1); padding: 2em; border-radius: 8px; backdrop-filter: blur(10px); }
+        .status-item { margin: 1em 0; padding: 1em; background: rgba(255,255,255,0.05); border-radius: 6px; }
+        .label { opacity: 0.7; font-size: 0.9em; }
+        .value { font-weight: bold; font-size: 1.1em; margin-top: 0.5em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✨ iScream Dashboard</h1>
+        <p>대시보드 시스템 운영 중</p>
+        <div class="status">
+            <div class="status-item">
+                <div class="label">상태</div>
+                <div class="value">🟢 온라인</div>
+            </div>
+            <div class="status-item">
+                <div class="label">배포</div>
+                <div class="value">✅ Vercel</div>
+            </div>
+            <div class="status-item">
+                <div class="label">마지막 업데이트</div>
+                <div class="value" id="time"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const now = new Date().toLocaleString('ko-KR');
+        document.getElementById('time').textContent = now;
+    </script>
+</body>
+</html>
